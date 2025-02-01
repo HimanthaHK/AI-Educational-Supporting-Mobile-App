@@ -1,4 +1,5 @@
 export default{
     WHITE: '#fff',
-    PRYMARY:'#0075ff'
+    PRYMARY:'#3e0e63',
+    SECONDARY:'#33cccc'
 }
