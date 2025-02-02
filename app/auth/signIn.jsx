@@ -1,96 +1,148 @@
-import { View, Text, Image, TouchableOpacity, TextInput, Pressable, StyleSheet, ToastAndroid } from 'react-native'
-import React, { useState } from 'react'
+import { View, Text, Image, TouchableOpacity, TextInput, Pressable, StyleSheet, Alert, ActivityIndicator, Platform } from 'react-native'
+import React, { useContext, useState } from 'react'
 import Colors from './../constant/Colors'
-import { router, useRouter } from 'expo-router'
+import { useRouter } from 'expo-router'
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../../config/firebaseConfig';
+import { auth, db } from '../../config/firebaseConfig';
+import { doc, getDoc } from 'firebase/firestore';
+import { UserDetailContext } from '../../context/UserDetailContext';
 
 export default function SignIn() {
 
-   const router=useRouter();
-   const [email,setEmail] = useState();
-   const [password,setPassword] = useState();
+   const router = useRouter();
+   const [email, setEmail] = useState('');
+   const [password, setPassword] = useState('');
+   const [loading, setLoading] = useState(false);
+   const { setUserDetails } = useContext(UserDetailContext);
 
-   const onSignClick=()=>{
-        signInWithEmailAndPassword(auth,email,password)
-        .then(resp=>{
-          const user=resp.user;
-          console.log(user);
-        }).catch(e=>{
-          console.log(e)
-          ToastAndroid.show('Incorrect Email & Passwors',ToastAndroid.BOTTOM)
-        })
-   }
+   const showError = (message) => {
+      if (Platform.OS === 'android') {
+         ToastAndroid.show(message, ToastAndroid.SHORT);
+      } else {
+         Alert.alert("Error", message);
+      }
+   };
 
-  return (
-    <View style={{
-        display:'flex',
-        flex:1,
-        paddingTop:100,
-        alignItems:'center',
-        backgroundColor:Colors.WHITE,
-        padding:30
-    }}>
-      <Image source={require('./../../assets/images/learning.gif')}
-      style={{
-        width:180,
-        height:180
-      }}/>
-      <Text style={{
-        fontSize:25,
-        fontFamily:'outfit-bold',
-        color:Colors.SECONDARY
-      }}>
-        Welcome Back!
-      </Text>
+   const onSignClick = () => {
+      if (!email || !password) {
+         showError("Please enter email and password");
+         return;
+      }
 
-      <TextInput placeholder='Email'
-      onChangeText={(value)=>setEmail(value)}
-      style={styles.textInput}/>
-      <TextInput placeholder='Password' 
-      onChangeText={(value)=>setPassword(value)}
-      secureTextEntry={true} style={styles.textInput}/>
+      setLoading(true);
+      signInWithEmailAndPassword(auth, email, password)
+         .then(async (resp) => {
+            const user = resp.user;
+            console.log(user);
+            await getUserDetails();
+            setLoading(false);
+            router.replace('/(tabs)/home');
+         })
+         .catch(e => {
+            console.log(e);
+            setLoading(false);
+            showError("Incorrect Email & Password");
+         });
+   };
 
-      <TouchableOpacity 
-        onPress={onSignClick}
-      style={{
-        padding:15,
-        width:'80%',
-        backgroundColor:Colors.PRYMARY,
-        marginTop:25,
-        borderRadius:35
-      }}>
-        <Text style={{
-            fontFamily:'outfit-bold',
-            color:Colors.WHITE,
-            textAlign:'center',
-            fontSize:18
-        }}>Sign In</Text>
-      </TouchableOpacity>
-      <View style={{
-        display:'flex',
-        flexDirection:'row', gap:5,
-        marginTop:10
-      }}>
-        <Text style={{fontFamily:'outfit'}}>Don't have an Account?</Text>
-        <Pressable onPress={()=> router.push('auth/signUp')}>
-            <Text style={{color:Colors.PRYMARY,fontFamily:'outfit-bold'}}>Sign Up here</Text>
-        </Pressable>
+   const getUserDetails = async () => {
+      try {
+         const userDoc = await getDoc(doc(db, 'users', email));
+         if (userDoc.exists()) {
+            console.log(userDoc.data());
+            setUserDetails(userDoc.data());
+         } else {
+            console.log("User not found in Firestore.");
+         }
+      } catch (error) {
+         console.log("Error fetching user details:", error);
+      }
+   };
+
+   return (
+      <View style={styles.container}>
+         <Image source={require('./../../assets/images/learning.gif')}
+            style={styles.image} />
+         <Text style={styles.welcomeText}>Welcome Back!</Text>
+
+         <TextInput placeholder='Email'
+            onChangeText={setEmail}
+            value={email}
+            style={styles.textInput}
+            keyboardType="email-address"
+            autoCapitalize="none" />
+         <TextInput placeholder='Password'
+            onChangeText={setPassword}
+            value={password}
+            secureTextEntry
+            style={styles.textInput} />
+
+         <TouchableOpacity
+            onPress={onSignClick}
+            disabled={loading}
+            style={styles.signInButton}>
+            {!loading ? <Text style={styles.signInText}>Sign In</Text> :
+               <ActivityIndicator size={'large'} color={Colors.SECONDARY} />
+            }
+         </TouchableOpacity>
+         <View style={styles.signUpContainer}>
+            <Text style={styles.normalText}>Don't have an Account?</Text>
+            <Pressable onPress={() => router.push('auth/signUp')}>
+               <Text style={styles.signUpText}>Sign Up here</Text>
+            </Pressable>
+         </View>
       </View>
-
-    </View>
-  )
+   );
 }
 
 const styles = StyleSheet.create({
-    textInput:{
-        borderWidth:2,
-        width:'100%',
-        padding:12,
-        fontSize:18,
-        marginTop:20,
-        borderRadius:15
-
-    
-    }
-})
+   container: {
+      flex: 1,
+      paddingTop: 100,
+      alignItems: 'center',
+      backgroundColor: Colors.WHITE,
+      padding: 30
+   },
+   image: {
+      width: 180,
+      height: 180
+   },
+   welcomeText: {
+      fontSize: 25,
+      fontFamily: 'outfit-bold',
+      color: Colors.SECONDARY
+   },
+   textInput: {
+      borderWidth: 2,
+      width: '100%',
+      padding: 12,
+      fontSize: 18,
+      marginTop: 20,
+      borderRadius: 15
+   },
+   signInButton: {
+      padding: 15,
+      width: '80%',
+      backgroundColor: Colors.PRYMARY,
+      marginTop: 25,
+      borderRadius: 35
+   },
+   signInText: {
+      fontFamily: 'outfit-bold',
+      color: Colors.WHITE,
+      textAlign: 'center',
+      fontSize: 18
+   },
+   signUpContainer: {
+      flexDirection: 'row',
+      gap: 5,
+      marginTop: 10
+   },
+   normalText: {
+      fontFamily: 'outfit'
+   },
+   signUpText: {
+      color: Colors.PRYMARY,
+      fontFamily: 'outfit-bold'
+   }
+});
