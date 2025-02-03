@@ -13,7 +13,7 @@ export default function SignIn() {
    const [email, setEmail] = useState('');
    const [password, setPassword] = useState('');
    const [loading, setLoading] = useState(false);
-   const { setUserDetails } = useContext(UserDetailContext);
+   const { setUserDetail } = useContext(UserDetailContext);
 
    const showError = (message) => {
       if (Platform.OS === 'android') {
@@ -22,7 +22,7 @@ export default function SignIn() {
          Alert.alert("Error", message);
       }
    };
-
+  
    const onSignClick = () => {
       if (!email || !password) {
          showError("Please enter email and password");
@@ -50,7 +50,7 @@ export default function SignIn() {
          const userDoc = await getDoc(doc(db, 'users', email));
          if (userDoc.exists()) {
             console.log(userDoc.data());
-            setUserDetails(userDoc.data());
+            setUserDetail(userDoc.data());
          } else {
             console.log("User not found in Firestore.");
          }
@@ -82,7 +82,7 @@ export default function SignIn() {
             disabled={loading}
             style={styles.signInButton}>
             {!loading ? <Text style={styles.signInText}>Sign In</Text> :
-               <ActivityIndicator size={'large'} color={Colors.SECONDARY} />
+               <ActivityIndicator size={24} color={Colors.SECONDARY} />
             }
          </TouchableOpacity>
          <View style={styles.signUpContainer}>
