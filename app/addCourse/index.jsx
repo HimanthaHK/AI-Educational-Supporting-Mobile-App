@@ -1,15 +1,21 @@
 import { View, Text, TextInput, StyleSheet, Keyboard, TouchableWithoutFeedback, Pressable } from 'react-native';
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import Colors from '../constant/Colors';
 import Button from '../../components/Shared/Button';
 import { GenerateCourseAIModel, GenerateTopicsAIModel } from '../../config/AiModel';
+import {db} from '../../config/firebaseConfig'
 import Prompt from '../constant/Prompt';
+import {UserDetailContext} from '../../context/UserDetailContext'
+import { useRouter } from 'expo-router';
+import { doc, setDoc } from 'firebase/firestore';
 
 export default function AddCourse() {
   const [loading, setLoading] = useState(false);
+  const userDetail = useContext(UserDetailContext);
   const [userInput, setUserInput] = useState('');
   const [topics, setTopics] = useState([]);
   const [selectedTopics,setSelectedTopics] = useState([]);
+  const router = useRouter();
 
   const onGenerateTopic = async () => {
     setLoading(true);
@@ -45,10 +51,31 @@ export default function AddCourse() {
   const onGenerateCourse=async()=>{
     setLoading(true);
     const PROMPT = selectedTopics+Prompt.COURSE;
+    try{
     const aiResp = await GenerateCourseAIModel.sendMessage(PROMPT);
-    const course = JSON.parse(aiResp.response.text());
-    console.log(course);
+    const resp = JSON.parse(aiResp.response.text());
+    const courses = resp.courses;
+    console.log(courses);
+   
+
+    //save to db
+    courses?.forEach(async (course)=>{
+      await setDoc(doc(db,'Courses',Date.now().toString()),{
+        ...course,
+        createdOn: new Date(),
+        createdBy: UserDetailContext?.email,
+      })
+    })
+    router.push('/(tabs)/home')
     setLoading(false);
+    }
+    catch(e){
+      setLoading(false);
+    }
+   
+
+    
+
 
   }
   return (
