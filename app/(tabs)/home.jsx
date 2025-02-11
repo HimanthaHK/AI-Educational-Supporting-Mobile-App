@@ -5,7 +5,8 @@ import Colors from '../constant/Colors'
 import NoCourse from '../../components/Home/NoCourse'
 import {db} from '../../config/firebaseConfig'
 import { UserDetailContext } from '../../context/UserDetailContext'
-import { doc, getDocs, where } from 'firebase/firestore'
+import { collection, doc, getDocs, query, where } from 'firebase/firestore'
+import CourseList from '../../components/Home/CourseList'
 
 export default function Home() {
 
@@ -22,7 +23,8 @@ export default function Home() {
     const querySnapshot=await getDocs(q);
 
     querySnapshot.forEach((doc)=>{
-      console.log("---",doc.data());
+      console.log(doc.data());
+      setCourseList(prev => [...prev,doc.data()])
     })
   }
 
@@ -35,7 +37,9 @@ export default function Home() {
         backgroundColor:Colors.WHITE
     }}>
       <Header/>
-      <NoCourse/>
+      {courseList?.length==0?
+      <NoCourse/>:<CourseList/>
+      }
     </View>
   )
 }

@@ -7,7 +7,7 @@ import { db } from '../../config/firebaseConfig';
 import Prompt from '../constant/Prompt';
 import { UserDetailContext } from '../../context/UserDetailContext';
 import { useRouter } from 'expo-router';
-import { doc, setDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, addDoc } from 'firebase/firestore';
 
 export default function AddCourse() {
   const [loading, setLoading] = useState(false);
@@ -17,19 +17,31 @@ export default function AddCourse() {
   const [selectedTopics, setSelectedTopics] = useState([]);
   const router = useRouter();
 
+  // **Generate Course Topics**
   const onGenerateTopic = async () => {
+    if (!userInput.trim()) {
+      console.error("User input is empty.");
+      return;
+    }
+
     setLoading(true);
     const PROMPT = userInput + Prompt.IDEA;
+
     try {
       const aiResp = await GenerateTopicsAIModel.sendMessage(PROMPT);
-      const topicIdea = JSON.parse(aiResp.response.text());
+      const responseText = aiResp?.response?.text()?.replace(/```json|```/g, ''); // Remove JSON code block markers
+      
+      if (!responseText) throw new Error("Empty AI response.");
 
+      const topicIdea = JSON.parse(responseText);
       console.log("AI Topic Response:", topicIdea);
+
       setTopics(topicIdea.course_titles || []);
     } catch (error) {
       console.error("Error parsing AI response:", error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const onTopicSelected = (topic) => {
@@ -40,48 +52,56 @@ export default function AddCourse() {
 
   const isTopicSelected = (topic) => selectedTopics.includes(topic);
 
+  // **Generate Course Details & Save to Firestore**
   const onGenerateCourse = async () => {
+    if (selectedTopics.length === 0) {
+      console.error("No topics selected for course generation.");
+      return;
+    }
+
     setLoading(true);
     const PROMPT = selectedTopics.join(', ') + Prompt.COURSE;
-  
+
     try {
       const aiResp = await GenerateCourseAIModel.sendMessage(PROMPT);
-      const responseText = await aiResp.response.text();
-  
+      const responseText = aiResp?.response?.text()?.replace(/```json|```/g, ''); // Clean JSON
+
+      if (!responseText) throw new Error("Empty AI response.");
+
       console.log("AI Course Response:", responseText);
-  
+
       const resp = JSON.parse(responseText);
-      const courses = resp.courses;
-  
-      if (!courses || !Array.isArray(courses)) {
-        throw new Error("Invalid course data received");
+      const courses = resp?.courses || [];
+
+      if (!Array.isArray(courses) || courses.length === 0) {
+        throw new Error("Invalid or empty course data.");
       }
-  
+
       console.log("Parsed Courses:", courses);
-  
-      // Save courses to Firestore
+
+      // **Save Courses to Firestore**
       for (const course of courses) {
         if (!course || typeof course !== "object") {
           console.error("Invalid course format:", course);
           continue;
         }
-  
-        const courseTitle = course.courseTitle || "Untitled Course"; //  Fix key name
+
+        const courseTitle = course.courseTitle || "Untitled Course"; // Fix key name
         const courseData = {
           ...course,
           title: courseTitle,  // Assign title correctly
           createdOn: new Date(),
           createdBy: userDetail?.email || "unknown",
         };
-  
+
         try {
-          await setDoc(doc(db, "Courses", Date.now().toString()), courseData);
+          await addDoc(collection(db, "Courses"), courseData);
           console.log("Course saved to Firestore:", courseTitle);
         } catch (dbError) {
           console.error("Error saving course to Firestore:", dbError);
         }
       }
-  
+
       router.push('/(tabs)/home');
     } catch (error) {
       console.error("Error in onGenerateCourse:", error);
@@ -89,7 +109,6 @@ export default function AddCourse() {
       setLoading(false);
     }
   };
-  
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
@@ -106,7 +125,7 @@ export default function AddCourse() {
           multiline={true}
           onChangeText={setUserInput}
         />
-        
+
         <Button text={'Generate Topics'} type='outline' onPress={onGenerateTopic} loading={loading} />
 
         <View style={styles.topicContainer}>
